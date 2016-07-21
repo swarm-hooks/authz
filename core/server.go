@@ -3,14 +3,15 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	"github.com/docker/docker/pkg/authorization"
-	"github.com/docker/docker/pkg/plugins"
-	"github.com/gorilla/mux"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
+
+	"github.com/Sirupsen/logrus"
+	"github.com/docker/docker/pkg/authorization"
+	"github.com/docker/docker/pkg/plugins"
+	"github.com/gorilla/mux"
 )
 
 const (
@@ -35,7 +36,6 @@ func NewAuthZSrv(plugin Authorizer, auditor Auditor) *AuthZSrv {
 
 // Start starts the authorization server
 func (a *AuthZSrv) Start() error {
-
 	err := a.authorizer.Init()
 
 	if err != nil {
@@ -57,7 +57,6 @@ func (a *AuthZSrv) Start() error {
 	if err != nil {
 		return err
 	}
-
 	router := mux.NewRouter()
 	router.HandleFunc("/Plugin.Activate", func(w http.ResponseWriter, r *http.Request) {
 		b, err := json.Marshal(plugins.Manifest{Implements: []string{authorization.AuthZApiImplements}})

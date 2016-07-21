@@ -3,17 +3,18 @@ package authz
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/Sirupsen/logrus"
-	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
-	"github.com/docker/docker/pkg/authorization"
-	"github.com/howeyc/fsnotify"
-	"github.com/twistlock/authz/core"
 	"io/ioutil"
 	"log/syslog"
 	"os"
 	"path"
 	"regexp"
 	"strings"
+
+	"github.com/Sirupsen/logrus"
+	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
+	"github.com/authz/core"
+	"github.com/docker/docker/pkg/authorization"
+	"github.com/howeyc/fsnotify"
 )
 
 // BasicPolicy represent a single policy object that is evaluated in the authorization flow.
