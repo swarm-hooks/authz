@@ -43,7 +43,7 @@ func main() {
 
 		switch c.GlobalString(authorizerFlag) {
 		case authorizerBasic:
-			authZHandler = authz.NewBasicAuthZAuthorizer(&authz.BasicAuthorizerSettings{PolicyPath: c.GlobalString(policyFileFlag)})
+			authZHandler = authz.NewBasicAuthZAuthorizer(&authz.BasicAuthorizerSettings{})
 		default:
 			panic(fmt.Sprintf("Unkwon authz hander %q", c.GlobalString(authorizerFlag)))
 		}

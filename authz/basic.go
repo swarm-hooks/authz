@@ -1,20 +1,15 @@
 package authz
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log/syslog"
 	"os"
 	"path"
-	"regexp"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	"github.com/authz/core"
 	"github.com/docker/docker/pkg/authorization"
-	"github.com/howeyc/fsnotify"
 )
 
 // BasicPolicy represent a single policy object that is evaluated in the authorization flow.
@@ -52,12 +47,11 @@ const defaultAuditLogPath = "/var/log/authz-broker.log"
 
 type basicAuthorizer struct {
 	settings *BasicAuthorizerSettings
-	policies []BasicPolicy
+	// policies []BasicPolicy
 }
 
 // BasicAuthorizerSettings provides settings for the basic authoerizer flow
 type BasicAuthorizerSettings struct {
-	PolicyPath string // PolicyPath is the path to the policy settings
 }
 
 // NewBasicAuthZAuthorizer creates a new basic authorizer
@@ -68,80 +62,6 @@ func NewBasicAuthZAuthorizer(settings *BasicAuthorizerSettings) core.Authorizer 
 // Init loads the basic authz plugin configuration from disk
 func (f *basicAuthorizer) Init() error {
 
-	err := f.loadPolicies()
-	if err != nil {
-		return err
-	}
-
-	watcher, err := fsnotify.NewWatcher()
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for {
-			select {
-			case ev := <-watcher.Event:
-				if ev.IsModify() {
-					err := f.loadPolicies()
-					if err != nil {
-						logrus.Errorf("Error refreshing policy %q", err.Error())
-					}
-				}
-			case err := <-watcher.Error:
-				logrus.Errorf("Settings watcher error '%v'", err)
-			}
-		}
-	}()
-
-	err = watcher.Watch(f.settings.PolicyPath)
-	if err != nil {
-		// Silently ignore watching error
-		logrus.Errorf("Failed to start watching folder %q", err.Error())
-	}
-
-	return nil
-}
-
-func (f *basicAuthorizer) loadPolicies() error {
-	data, err := ioutil.ReadFile(path.Join(f.settings.PolicyPath))
-
-	if err != nil {
-		return err
-	}
-
-	var policies []BasicPolicy
-	for _, l := range strings.Split(string(data), "\n") {
-
-		if l == "" {
-			continue
-		}
-
-		var policy BasicPolicy
-		err := json.Unmarshal([]byte(l), &policy)
-		if err != nil {
-			logrus.Errorf("Failed to unmarshel policy entry %q %q", l, err.Error())
-		}
-		policies = append(policies, policy)
-	}
-	logrus.Infof("Loaded '%d' policies", len(policies))
-
-	// Notify when user appears in duplicate policies
-	userToPolicy := make(map[string]string)
-	for _, policy := range policies {
-		for _, u := range policy.Users {
-			if userPolicy, ok := userToPolicy[u]; ok {
-				logrus.Warnf("User %q already appears in policy %q. Only single policy applies. Undefined policy behavior %q",
-					u,
-					userPolicy,
-					policy.Name)
-			}
-			userToPolicy[u] = policy.Name
-		}
-
-	}
-
-	f.policies = policies
 	return nil
 }
 
@@ -151,37 +71,42 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 
 	action := core.ParseRoute(authZReq.RequestMethod, authZReq.RequestURI)
 
-	for _, policy := range f.policies {
-		for _, user := range policy.Users {
-			if user == authZReq.User {
-				for _, policyActionPattern := range policy.Actions {
-					match, err := regexp.MatchString(policyActionPattern, action)
-					if err != nil {
-						logrus.Errorf("Failed to evaulate action %q against policy %q error %q", action, policyActionPattern, err.Error())
-					}
-
-					if match {
-
-						if policy.Readonly && authZReq.RequestMethod != "GET" {
-							return &authorization.Response{
-								Allow: false,
-								Msg:   fmt.Sprintf("action '%s' not allowed for user '%s' by readonly policy '%s'", action, authZReq.User, policy.Name),
-							}
-						}
-
-						return &authorization.Response{
-							Allow: true,
-							Msg:   fmt.Sprintf("action '%s' allowed for user '%s' by policy '%s'", action, authZReq.User, policy.Name),
-						}
-					}
-				}
-				return &authorization.Response{
-					Allow: false,
-					Msg:   fmt.Sprintf("action '%s' denied for user '%s' by policy '%s'", action, authZReq.User, policy.Name),
-				}
-			}
-		}
+	return &authorization.Response{
+		Allow: true,
+		Msg:   fmt.Sprintf("OK for  (user: '%s' action: '%s')", authZReq.User, action),
 	}
+
+	// for _, policy := range f.policies {
+	// 	for _, user := range policy.Users {
+	// 		if user == authZReq.User {
+	// 			for _, policyActionPattern := range policy.Actions {
+	// 				match, err := regexp.MatchString(policyActionPattern, action)
+	// 				if err != nil {
+	// 					logrus.Errorf("Failed to evaulate action %q against policy %q error %q", action, policyActionPattern, err.Error())
+	// 				}
+
+	// 				if match {
+
+	// 					if policy.Readonly && authZReq.RequestMethod != "GET" {
+	// 						return &authorization.Response{
+	// 							Allow: false,
+	// 							Msg:   fmt.Sprintf("action '%s' not allowed for user '%s' by readonly policy '%s'", action, authZReq.User, policy.Name),
+	// 						}
+	// 					}
+
+	// 					return &authorization.Response{
+	// 						Allow: true,
+	// 						Msg:   fmt.Sprintf("action '%s' allowed for user '%s' by policy '%s'", action, authZReq.User, policy.Name),
+	// 					}
+	// 				}
+	// 			}
+	// 			return &authorization.Response{
+	// 				Allow: false,
+	// 				Msg:   fmt.Sprintf("action '%s' denied for user '%s' by policy '%s'", action, authZReq.User, policy.Name),
+	// 			}
+	// 		}
+	// 	}
+	// }
 
 	return &authorization.Response{
 		Allow: false,
