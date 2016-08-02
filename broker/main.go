@@ -61,6 +61,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
 	}
 
 	app.Flags = []cli.Flag{

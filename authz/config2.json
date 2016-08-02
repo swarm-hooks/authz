@@ -1,0 +1,7 @@
+{
+	"auths": {},
+	"HttpHeaders": {
+		"X-Auth-TenantId": "Id12345NN",
+		"X-Auth-Token": "Token1234"
+	}
+}

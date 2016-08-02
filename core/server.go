@@ -19,6 +19,9 @@ const (
 	pluginFolder = "/run/docker/plugins"
 )
 
+//ID2TenantMap - Keep track about resource ownership
+var ID2TenantMap map[string]string
+
 // AuthZSrv implements the authz plugin specification on top of unix sockets
 // the authZSrv uses two core components to manage the flow, the authorizer,
 // which is used to perform the actual authorization and the auditor, which
@@ -126,7 +129,8 @@ func (a *AuthZSrv) Start() error {
 		}
 		writeResponse(w, authZRes)
 	})
-
+	ID2TenantMap = make(map[string]string)
+	logrus.Info("Initialized authorization server")
 	return http.Serve(a.listener, router)
 }
 
