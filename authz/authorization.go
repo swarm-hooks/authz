@@ -84,7 +84,7 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 		}
 	}
 
-	action, id := core.ParseRoute(authZReq.RequestMethod, authZReq.RequestURI)
+	action, idOrName := core.ParseRoute(authZReq.RequestMethod, authZReq.RequestURI)
 
 	//TODO - Actaully ban container create
 	if action == core.ActionServiceCreate {
@@ -100,7 +100,7 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 		}
 	}
 	//Check in my map
-	if core.ID2TenantMap[id] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] {
+	if core.ID2TenantMap[idOrName] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] || core.ID2TenantMap[core.Name2TIDMap[idOrName]] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] {
 		return &authorization.Response{
 			Allow: true,
 			Msg:   fmt.Sprintf("OK for  (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
@@ -109,7 +109,7 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 
 	return &authorization.Response{
 		Allow: false,
-		Msg:   fmt.Sprintf("Not authorized for  (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
+		Msg:   fmt.Sprintf("Not authorized for (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
 	}
 }
 
@@ -120,13 +120,10 @@ func (f *basicAuthorizer) AuthZRes(authZReq *authorization.Request) *authorizati
 	if action == core.ActionServiceCreate {
 
 		var response interface{}
-		logrus.Info(string(authZReq.ResponseBody[:len(authZReq.ResponseBody)]))
-
 		err := json.Unmarshal(authZReq.ResponseBody, &response)
 		if err != nil {
 			logrus.Error(err)
 			return &authorization.Response{Allow: false}
-
 		}
 		m := response.(map[string]interface{})
 
@@ -147,12 +144,12 @@ func (f *basicAuthorizer) AuthZRes(authZReq *authorization.Request) *authorizati
 				panic(err)
 			}
 
-			swrmService, byt, err := cli.ServiceInspectWithRaw(context.Background(), id)
+			swrmService, _, err := cli.ServiceInspectWithRaw(context.Background(), id)
 			if err != nil {
 				panic(err)
 			}
-			logrus.Info(string(byt[:len(byt)]))
-			logrus.Info(swrmService)
+
+			core.Name2TIDMap[swrmService.Spec.Name] = swrmService.ID
 
 		}(srvID, authZReq.RequestHeaders[AuthZTenantIDHeaderName])
 
