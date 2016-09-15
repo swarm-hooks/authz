@@ -6,11 +6,14 @@ import (
 	"log/syslog"
 	"os"
 	"path"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	logrus_syslog "github.com/Sirupsen/logrus/hooks/syslog"
 	"github.com/authz/core"
 	"github.com/docker/docker/pkg/authorization"
+
+	"github.com/docker/engine-api/types"
 
 	//	"fmt"
 
@@ -100,7 +103,8 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 		}
 	}
 	//Check in my map
-	if core.ID2TenantMap[idOrName] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] || core.ID2TenantMap[core.Name2TIDMap[idOrName]] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] {
+	if core.ID2TenantMap[idOrName] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] ||
+		core.ID2TenantMap[core.Name2TIDMap[idOrName+authZReq.RequestHeaders[AuthZTenantIDHeaderName]]] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] {
 		return &authorization.Response{
 			Allow: true,
 			Msg:   fmt.Sprintf("OK for  (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
@@ -144,13 +148,25 @@ func (f *basicAuthorizer) AuthZRes(authZReq *authorization.Request) *authorizati
 				panic(err)
 			}
 
-			swrmService, _, err := cli.ServiceInspectWithRaw(context.Background(), id)
+			swrmService, byt, err := cli.ServiceInspectWithRaw(context.Background(), id)
 			if err != nil {
 				panic(err)
 			}
 
+			swrmService.Spec.Name = swrmService.Spec.Name + authZReq.RequestHeaders[AuthZTenantIDHeaderName]
 			core.Name2TIDMap[swrmService.Spec.Name] = swrmService.ID
-
+			logrus.Info("swrmService.Spec.Name")
+			logrus.Info(swrmService)
+			logrus.Info("swrmService.Spec.Name")
+			s := string(byt[:len(byt)])
+			logrus.Info(s)
+			logrus.Info("swrmService.Spec.Name")
+			t0 := time.Now()
+			e1 := cli.ServiceUpdate(context.Background(), swrmService.ID, swrmService.Version, swrmService.Spec, types.ServiceUpdateOptions{})
+			t1 := time.Now()
+			d := t1.Sub(t0)
+			logrus.Info(d)
+			logrus.Error(e1)
 		}(srvID, authZReq.RequestHeaders[AuthZTenantIDHeaderName])
 
 	}

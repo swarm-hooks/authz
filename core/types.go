@@ -115,6 +115,8 @@ var (
 	ActionServiceCreate = "service_create"
 	// ActionServiceInspect describes https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#/inspect-one-or-more-services
 	ActionServiceInspect = "service_inspect"
+	// ActionServiceUpdate describes https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#/update-a-service
+	ActionServiceUpdate = "service_update"
 	// ActionNone indicates no action matched the given method URL combination
 	ActionNone = ""
 )

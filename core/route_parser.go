@@ -123,6 +123,8 @@ var routes = []route{
 	{pattern: "/services/create", method: "POST", action: ActionServiceCreate},
 	//https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#/inspect-one-or-more-services
 	{pattern: "/services/(.+)", method: "GET", action: ActionServiceInspect},
+	//https://docs.docker.com/engine/reference/api/docker_remote_api_v1.24/#/update-a-service
+	{pattern: "/services/(.+)", method: "POST", action: ActionServiceUpdate},
 }
 
 // ParseRoute convert a method/url pattern to corresponding docker action
