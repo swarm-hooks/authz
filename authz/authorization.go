@@ -80,40 +80,33 @@ var AuthZTenantIDHeaderName = "X-Auth-Tenantid"
 func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorization.Response {
 
 	logrus.Infof("Received AuthZ request, method: '%s', url: '%s' , headers: '%s'", authZReq.RequestMethod, authZReq.RequestURI, authZReq.RequestHeaders)
-	if authZReq.RequestHeaders[AuthZTenantIDHeaderName] == "" {
-		return &authorization.Response{
-			Allow: false,
-			Msg:   fmt.Sprintf("No action allowed without tenant identification"),
-		}
-	}
 
-	action, idOrName := core.ParseRoute(authZReq.RequestMethod, authZReq.RequestURI)
+	action, _ := core.ParseRoute(authZReq.RequestMethod, authZReq.RequestURI)
 
-	//TODO - Actaully ban container create
-	if action == core.ActionServiceCreate {
-		return &authorization.Response{
-			Allow: true,
-			Msg:   fmt.Sprintf("OK for  (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
-		}
-	}
 	if action == core.ActionContainerCreate {
-		return &authorization.Response{
-			Allow: false,
-			Msg:   fmt.Sprintf("You are only allowed to create services"),
-		}
-	}
-	//Check in my map
-	if core.ID2TenantMap[idOrName] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] ||
-		core.ID2TenantMap[core.Name2TIDMap[idOrName+authZReq.RequestHeaders[AuthZTenantIDHeaderName]]] == authZReq.RequestHeaders[AuthZTenantIDHeaderName] {
-		return &authorization.Response{
-			Allow: true,
-			Msg:   fmt.Sprintf("OK for  (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
-		}
-	}
+		var request interface{}
+		err := json.Unmarshal(authZReq.RequestBody, &request)
 
+		m := request.(map[string]map[string]interface{})
+
+		if m["HostConfig"]["Memory"] == nil {
+			logrus.Error(err)
+			return &authorization.Response{
+				Allow: false,
+			}
+		}
+		memLimit := 0
+		totalMemory := 0
+		memory := m["HostConfig"]["Memory"].(int)
+		if totalMemory+memory < memLimit {
+			return &authorization.Response{
+				Allow: true,
+			}
+		}
+
+	}
 	return &authorization.Response{
 		Allow: false,
-		Msg:   fmt.Sprintf("Not authorized for (tenant: '%s' action: '%s')", authZReq.RequestHeaders[AuthZTenantIDHeaderName], action),
 	}
 }
 
