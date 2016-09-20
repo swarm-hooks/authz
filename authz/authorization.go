@@ -63,6 +63,9 @@ type basicAuthorizer struct {
 type BasicAuthorizerSettings struct {
 }
 
+var memoryLimit float64
+var totalMemory float64
+
 // NewBasicAuthZAuthorizer creates a new basic authorizer
 func NewBasicAuthZAuthorizer(settings *BasicAuthorizerSettings) core.Authorizer {
 	return &basicAuthorizer{settings: settings}
@@ -70,7 +73,23 @@ func NewBasicAuthZAuthorizer(settings *BasicAuthorizerSettings) core.Authorizer 
 
 // Init loads the basic authz plugin configuration from disk
 func (f *basicAuthorizer) Init() error {
+	totalMemory = 0.0
+	memoryLimit = 0.0
+	return nil
+}
 
+func initializeOnFirstCall() error {
+	defaultHeaders := map[string]string{"User-Agent": "engine-api-cli-1.0", AuthZTenantIDHeaderName: "infoTenantInternal"}
+	cli, err := client.NewClient("unix:///var/run/docker.sock", "v1.24", nil, defaultHeaders)
+	if err != nil {
+		panic(err)
+	}
+
+	info, err := cli.Info(context.Background())
+	logrus.Info(info)
+	if err != nil {
+		panic(err)
+	}
 	return nil
 }
 
@@ -78,7 +97,9 @@ func (f *basicAuthorizer) Init() error {
 var AuthZTenantIDHeaderName = "X-Auth-Tenantid"
 
 func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorization.Response {
-
+	if memoryLimit == 0.0 {
+		initializeOnFirstCall()
+	}
 	logrus.Infof("Received AuthZ request, method: '%s', url: '%s' , headers: '%s'", authZReq.RequestMethod, authZReq.RequestURI, authZReq.RequestHeaders)
 
 	action, _ := core.ParseRoute(authZReq.RequestMethod, authZReq.RequestURI)
@@ -86,19 +107,22 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 	if action == core.ActionContainerCreate {
 		var request interface{}
 		err := json.Unmarshal(authZReq.RequestBody, &request)
-
-		m := request.(map[string]map[string]interface{})
-
-		if m["HostConfig"]["Memory"] == nil {
+		if err != nil {
 			logrus.Error(err)
+		}
+		m := request.(map[string]interface{})
+		logrus.Info(m)
+		hostConfig := m["HostConfig"].(map[string]interface{})
+
+		memory := hostConfig["Memory"].(float64)
+		if memory == 0.0 {
 			return &authorization.Response{
 				Allow: false,
+				Msg:   "Must request Memory",
 			}
 		}
-		memLimit := 0
-		totalMemory := 0
-		memory := m["HostConfig"]["Memory"].(int)
-		if totalMemory+memory < memLimit {
+		logrus.Info(memory)
+		if totalMemory+memory < memoryLimit {
 			return &authorization.Response{
 				Allow: true,
 			}
@@ -106,7 +130,7 @@ func (f *basicAuthorizer) AuthZReq(authZReq *authorization.Request) *authorizati
 
 	}
 	return &authorization.Response{
-		Allow: false,
+		Allow: true,
 	}
 }
 
